@@ -1,0 +1,15 @@
+:8081 {
+    handle /api/* {
+        reverse_proxy localhost:8080
+    }
+    handle {
+        reverse_proxy localhost:8000
+    }
+    # if localhost:8000 (elm-live) is not up, serve static files
+    handle_errors 502 {
+        root fe/assets
+        file_server {
+            status 200
+        }
+    }
+}

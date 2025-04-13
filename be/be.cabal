@@ -1,0 +1,68 @@
+cabal-version: 3.0
+name:          be
+version:       0.0.0.0
+build-type:    Simple
+
+common warnings
+  default-language:   GHC2021
+  default-extensions:
+    BlockArguments
+    DataKinds
+    DerivingVia
+    DuplicateRecordFields
+    LambdaCase
+    MultiWayIf
+    NoFieldSelectors
+    OverloadedRecordDot
+    OverloadedStrings
+    RecordWildCards
+
+  ghc-options:        -Wall
+
+library
+  import:          warnings
+  exposed-modules:
+    TODO.API
+    TODO.Domain
+    TODO.Handlers
+    TODO.Store
+    TODO.Store.InMemory
+    TODO.Store.InMemory.Type
+
+  build-depends:
+    , aeson
+    , base
+    , containers
+    , deriving-aeson
+    , mtl
+    , servant
+    , servant-server
+    , tagged
+    , text
+    , uuid
+
+  hs-source-dirs:  src
+
+executable be
+  import:         warnings
+  main-is:        Main.hs
+  build-depends:
+    , base
+    , be
+    , servant-server
+    , warp
+
+  hs-source-dirs: app
+
+executable generate-elm-api
+  import:         warnings
+  main-is:        ElmAPI.hs
+  build-depends:
+    , base
+    , be
+    , elm-bridge
+    , servant
+    , servant-elm
+    , text
+
+  hs-source-dirs: app
