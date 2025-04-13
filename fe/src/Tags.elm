@@ -17,7 +17,9 @@ import Result.Extra exposing (..)
 
 
 type alias Model =
-    List TagModel
+    { tags : List TagModel
+    , csrf : String
+    }
 
 
 type alias Nonce =
@@ -72,22 +74,25 @@ formatColor color =
     "#" ++ color
 
 
-init : List Tag -> Model
-init =
-    List.map (\tag -> Normal { tag = tag, editing = Nothing })
+init : String -> List Tag -> Model
+init csrf tags =
+    { tags = List.map (\tag -> Normal { tag = tag, editing = Nothing }) tags
+    , csrf = csrf
+    }
 
 
 tagsFromModel : Model -> List Tag
-tagsFromModel =
-    List.filterMap
-        (\mod ->
-            case mod of
-                Normal { tag } ->
-                    Just tag
+tagsFromModel model =
+    model.tags
+        |> List.filterMap
+            (\mod ->
+                case mod of
+                    Normal { tag } ->
+                        Just tag
 
-                New _ ->
-                    Nothing
-        )
+                    New _ ->
+                        Nothing
+            )
 
 
 type Msg
@@ -106,7 +111,7 @@ type Msg
     | NewCanceled Nonce
 
 
-findUnusedNonce : Model -> Nonce
+findUnusedNonce : List TagModel -> Nonce
 findUnusedNonce =
     List.foldl
         (\mod n ->
@@ -173,102 +178,128 @@ updateNewTag tags n f =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg tags =
+update msg model =
     case msg of
         NoOp ->
-            ( tags, Cmd.none )
+            ( model, Cmd.none )
 
         EditClicked id ->
-            ( updateNormalTag tags id <|
-                \tag _ ->
-                    Normal
-                        { tag = tag
-                        , editing =
-                            Just
-                                { inputName = tag.name
-                                , name = Just tag.name
-                                , inputColor = formatColor tag.color
-                                , color = Just tag.color
+            ( { model
+                | tags =
+                    updateNormalTag model.tags id <|
+                        \tag _ ->
+                            Normal
+                                { tag = tag
+                                , editing =
+                                    Just
+                                        { inputName = tag.name
+                                        , name = Just tag.name
+                                        , inputColor = formatColor tag.color
+                                        , color = Just tag.color
+                                        }
                                 }
-                        }
+              }
             , Cmd.none
             )
 
         EditUpdated id editing ->
-            ( updateNormalTag tags id <|
-                \tag _ -> Normal { tag = tag, editing = Just editing }
+            ( { model
+                | tags =
+                    updateNormalTag model.tags id <|
+                        \tag _ -> Normal { tag = tag, editing = Just editing }
+              }
             , Cmd.none
             )
 
         EditSubmitted id ins ->
-            ( tags
-            , putApiTagsByTag_id id ins (withResult (\_ -> NoOp) Edited)
+            ( model
+            , putApiTagsByTag_id model.csrf id ins (withResult (\_ -> NoOp) Edited)
             )
 
         Edited tag ->
-            ( updateNormalTag tags tag.id <|
-                \_ _ -> Normal { tag = tag, editing = Nothing }
+            ( { model
+                | tags =
+                    updateNormalTag model.tags tag.id <|
+                        \_ _ -> Normal { tag = tag, editing = Nothing }
+              }
             , Cmd.none
             )
 
         EditCancelled id ->
-            ( updateNormalTag tags id <|
-                \tag _ -> Normal { tag = tag, editing = Nothing }
+            ( { model
+                | tags =
+                    updateNormalTag model.tags id <|
+                        \tag _ -> Normal { tag = tag, editing = Nothing }
+              }
             , Cmd.none
             )
 
         DeleteClicked id ->
-            ( tags
-            , deleteApiTagsByTag_id id (withResult (\_ -> NoOp) (\_ -> Deleted id))
+            ( model
+            , deleteApiTagsByTag_id model.csrf id (withResult (\_ -> NoOp) (\_ -> Deleted id))
             )
 
         Deleted id ->
-            ( tags
-                |> deleteFirstMatch
-                    (\mod ->
-                        case mod of
-                            Normal { tag } ->
-                                tag.id == id
+            ( { model
+                | tags =
+                    model.tags
+                        |> deleteFirstMatch
+                            (\mod ->
+                                case mod of
+                                    Normal { tag } ->
+                                        tag.id == id
 
-                            _ ->
-                                False
-                    )
+                                    _ ->
+                                        False
+                            )
+              }
             , Cmd.none
             )
 
         NewClicked ->
-            ( tags ++ [ New { nonce = findUnusedNonce tags, editing = newEditing } ]
+            ( { model
+                | tags = model.tags ++ [ New { nonce = findUnusedNonce model.tags, editing = newEditing } ]
+              }
             , Cmd.none
             )
 
         NewUpdated nonce editing ->
-            ( updateNewTag tags nonce <|
-                \_ -> New { nonce = nonce, editing = editing }
+            ( { model
+                | tags =
+                    updateNewTag model.tags nonce <|
+                        \_ -> New { nonce = nonce, editing = editing }
+              }
             , Cmd.none
             )
 
         NewSubmitted nonce ins ->
-            ( tags
-            , postApiTags ins (withResult (\_ -> NoOp) (NewCreated nonce))
+            ( model
+            , postApiTags model.csrf ins (withResult (\_ -> NoOp) (NewCreated nonce))
             )
 
         NewCreated nonce tag ->
-            ( updateNewTag tags nonce <|
-                \_ -> Normal { tag = tag, editing = Nothing }
+            ( { model
+                | tags =
+                    updateNewTag model.tags nonce <|
+                        \_ -> Normal { tag = tag, editing = Nothing }
+              }
             , Cmd.none
             )
 
         NewCanceled nonce ->
-            ( tags
-                |> deleteFirstMatch
-                    (\mod ->
-                        case mod of
-                            New tag ->
-                                tag.nonce == nonce
+            ( { model
+                | tags =
+                    model.tags
+                        |> deleteFirstMatch
+                            (\mod ->
+                                case mod of
+                                    New tag ->
+                                        tag.nonce == nonce
 
-                            _ ->
-                                False
-                    )
+                                    _ ->
+                                        False
+                            )
+              }
             , Cmd.none
             )
 
@@ -325,7 +356,7 @@ submitView edit onSubmit =
 
 
 view : Model -> List (Html Msg)
-view tags =
+view model =
     h2 [] [ text "Tags" ]
         :: List.map
             (\mod ->
@@ -356,5 +387,5 @@ view tags =
                             , button [ onClick (NewCanceled nonce) ] [ i [ class "fa fa-times-circle" ] [] ]
                             ]
             )
-            tags
+            model.tags
         ++ [ button [ onClick NewClicked ] [ i [ class "fa fa-plus" ] [] ] ]

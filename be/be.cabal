@@ -23,6 +23,7 @@ library
   import:          warnings
   exposed-modules:
     TODO.API
+    TODO.Auth
     TODO.Domain
     TODO.Handlers
     TODO.Store
@@ -32,14 +33,18 @@ library
   build-depends:
     , aeson
     , base
+    , bytestring
     , containers
+    , cookie
     , deriving-aeson
+    , http-types
     , mtl
     , servant
     , servant-server
     , tagged
     , text
     , uuid
+    , wai
 
   hs-source-dirs:  src
 

@@ -40,7 +40,7 @@ Run these three services in parallel:
   ```
   If `elm-live` is not running, Caddy will instead serve the output of the "Building" step: `fe/assets/elm.js`.
 
-[http://localhost:8081/](http://localhost:8081/)
+[http://localhost:8081/api/auth](http://localhost:8081/api/auth)
 
 ## Docker
 
@@ -49,4 +49,4 @@ nix-build
 docker load -i result
 docker run -p 8081:80 todo-docker
 ```
-[http://localhost:8081/](http://localhost:8081/)
+[http://localhost:8081/api/auth](http://localhost:8081/api/auth)

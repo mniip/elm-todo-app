@@ -11,6 +11,7 @@ import Data.Text qualified as Text
 import Data.UUID
 import Deriving.Aeson
 import Servant.API
+import Web.Cookie
 
 
 type API = "api" :> NamedRoutes APIRoutes
@@ -24,6 +25,13 @@ data APIRoutes mode = APIRoutes
     :: mode
     :- "tags"
     :> NamedRoutes TagsRoutes
+  , auth
+    :: mode
+    :- "auth"
+    :> Verb GET 302 '[JSON]
+      (Headers
+        [Header "Set-Cookie" SetCookie, Header "Location" String]
+        NoContent)
   } deriving stock (Generic)
 
 data ItemsRoutes mode = ItemsRoutes

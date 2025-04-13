@@ -8,6 +8,7 @@ import Data.List.NonEmpty qualified as NonEmpty
 import Servant.API
 import Servant.Server
 import TODO.API qualified as API
+import TODO.Auth
 import TODO.Domain
 import TODO.Store
 
@@ -28,6 +29,7 @@ handlers = API.APIRoutes
     , update = handleUpdateTag
     , delete = handleDeleteTag
     }
+  , auth = handleAuth
   }
 
 handleListRootItems :: MonadTaskStore m => m [API.ItemBrief]

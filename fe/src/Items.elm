@@ -20,6 +20,7 @@ import UUID
 type alias Model =
     { tree : ItemTree
     , dragDrop : Html5.DragDrop.Model ItemRef (List ItemId)
+    , csrf : String
     }
 
 
@@ -373,15 +374,16 @@ type Msg
     | DragDropMsg (Html5.DragDrop.Msg ItemRef (List ItemId))
 
 
-init : List ItemBrief -> ( Model, Cmd Msg )
-init items =
+init : String -> List ItemBrief -> ( Model, Cmd Msg )
+init csrf items =
     ( { tree = List.map Brief items
       , dragDrop = Html5.DragDrop.init
+      , csrf = csrf
       }
     , items
         |> List.map
             (\brief ->
-                getApiItemsByItem_id brief.id <|
+                getApiItemsByItem_id csrf brief.id <|
                     withResult (\_ -> NoOp) (GotPending [])
             )
         |> Cmd.batch
@@ -406,8 +408,8 @@ type TreeUpdate
     | ChildrenChanged ItemRef
 
 
-requestChildrenOf : List ItemId -> ItemModel -> Cmd Msg
-requestChildrenOf crumbs mod =
+requestChildrenOf : String -> List ItemId -> ItemModel -> Cmd Msg
+requestChildrenOf csrf crumbs mod =
     case mod of
         Normal item ->
             item.children
@@ -428,7 +430,8 @@ requestChildrenOf crumbs mod =
                     )
                 |> List.map
                     (\id ->
-                        getApiItemsByItem_id id
+                        getApiItemsByItem_id csrf
+                            id
                             (withResult (\_ -> NoOp) (GotPending (crumbs ++ [ item.id ])))
                     )
                 |> Cmd.batch
@@ -437,14 +440,14 @@ requestChildrenOf crumbs mod =
             Cmd.none
 
 
-requestChildrenAfterUpdate : ItemTree -> TreeUpdate -> Cmd Msg
-requestChildrenAfterUpdate tree upd =
+requestChildrenAfterUpdate : String -> ItemTree -> TreeUpdate -> Cmd Msg
+requestChildrenAfterUpdate csrf tree upd =
     case upd of
         Expanded ref ->
             case getItemNested tree ref of
                 Just (Normal item) ->
                     item.children
-                        |> List.map (requestChildrenOf (ref.crumbs ++ [ item.id ]))
+                        |> List.map (requestChildrenOf csrf (ref.crumbs ++ [ item.id ]))
                         |> Cmd.batch
 
                 _ ->
@@ -454,13 +457,13 @@ requestChildrenAfterUpdate tree upd =
             case getItemWithParent tree ref of
                 Just ( mod, Just parent ) ->
                     if parent.expanded then
-                        requestChildrenOf ref.crumbs mod
+                        requestChildrenOf csrf ref.crumbs mod
 
                     else
                         Cmd.none
 
                 Just ( mod, Nothing ) ->
-                    requestChildrenOf ref.crumbs mod
+                    requestChildrenOf csrf ref.crumbs mod
 
                 Nothing ->
                     Cmd.none
@@ -482,14 +485,14 @@ update msg model =
                         ref
                         (Normal (normalItemFromItem item))
             in
-            ( { model | tree = newTree }, requestChildrenAfterUpdate newTree (ChildrenChanged ref) )
+            ( { model | tree = newTree }, requestChildrenAfterUpdate model.csrf newTree (ChildrenChanged ref) )
 
         ExpandClicked ref ->
             let
                 newTree =
                     updateNormalItemNested model.tree ref (\item -> Normal { item | expanded = True })
             in
-            ( { model | tree = newTree }, requestChildrenAfterUpdate newTree (Expanded ref) )
+            ( { model | tree = newTree }, requestChildrenAfterUpdate model.csrf newTree (Expanded ref) )
 
         CollapseClicked ref ->
             ( { model
@@ -552,7 +555,7 @@ update msg model =
               }
             , case getItemNested model.tree ref of
                 Just (Normal item) ->
-                    putApiItemsByItem_id item.id
+                    putApiItemsByItem_id model.csrf item.id
                         { title = item.title
                         , tags = item.tags
                         , completed = not item.pendingCompleted
@@ -589,7 +592,7 @@ update msg model =
                                     Normal new
                         )
             in
-            ( { model | tree = newTree }, requestChildrenAfterUpdate newTree (ChildrenChanged ref) )
+            ( { model | tree = newTree }, requestChildrenAfterUpdate model.csrf newTree (ChildrenChanged ref) )
 
         EditClicked ref ->
             ( { model
@@ -633,7 +636,7 @@ update msg model =
 
         EditSubmitted crumbs id ins ->
             ( model
-            , putApiItemsByItem_id id ins (withResult (\_ -> NoOp) (Edited crumbs))
+            , putApiItemsByItem_id model.csrf id ins (withResult (\_ -> NoOp) (Edited crumbs))
             )
 
         Edited crumbs item ->
@@ -659,7 +662,7 @@ update msg model =
 
         DeleteClicked crumbs id ->
             ( model
-            , deleteApiItemsByItem_id id (withResult (\_ -> NoOp) (\_ -> Deleted crumbs id))
+            , deleteApiItemsByItem_id model.csrf id (withResult (\_ -> NoOp) (\_ -> Deleted crumbs id))
             )
 
         Deleted crumbs id ->
@@ -714,7 +717,7 @@ update msg model =
 
         NewSubmitted crumbs nonce ins ->
             ( model
-            , postApiItems ins (withResult (\_ -> NoOp) (Added crumbs nonce))
+            , postApiItems model.csrf ins (withResult (\_ -> NoOp) (Added crumbs nonce))
             )
 
         Added crumbs nonce item ->
@@ -726,7 +729,7 @@ update msg model =
               }
             , case last crumbs of
                 Just parentId ->
-                    patchApiItemsByItem_idParent item.id (Just parentId) (\_ -> NoOp)
+                    patchApiItemsByItem_idParent model.csrf item.id (Just parentId) (\_ -> NoOp)
 
                 Nothing ->
                     Cmd.none
@@ -764,7 +767,7 @@ update msg model =
                             ( { model
                                 | dragDrop = dragDrop
                               }
-                            , patchApiItemsByItem_idParent item.id (last to) (withResult (\_ -> NoOp) (\_ -> Reparented from to))
+                            , patchApiItemsByItem_idParent model.csrf item.id (last to) (withResult (\_ -> NoOp) (\_ -> Reparented from to))
                             )
 
                         _ ->

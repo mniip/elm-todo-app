@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser
+import CSRF
 import Generated.API exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (style)
@@ -15,14 +16,16 @@ main =
     Browser.element
         { init = init
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         , view = view
         }
 
 
 type Model
-    = Loading
-        { items : Maybe (List ItemBrief)
+    = LoadingCSRF
+    | Loading
+        { csrf : String
+        , items : Maybe (List ItemBrief)
         , tags : Maybe (List Tag)
         }
     | LoadingFailed String
@@ -44,20 +47,23 @@ withResult onErr onOk result =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Loading
-        { items = Nothing
-        , tags = Nothing
-        }
-    , Cmd.batch
-        [ getApiItems (withResult GotLoadingError LoadedItemList)
-        , getApiTags (withResult GotLoadingError LoadedTagList)
-        ]
-    )
+    ( LoadingCSRF, CSRF.getCsrfToken () )
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    case model of
+        LoadingCSRF ->
+            CSRF.gotCsrfToken LoadedCSRF
+
+        _ ->
+            Sub.none
 
 
 type Msg
     = LoadedItemList (List ItemBrief)
     | LoadedTagList (List Tag)
+    | LoadedCSRF String
     | GotLoadingError Http.Error
     | TagMsg Tags.Msg
     | ItemMsg Items.Msg
@@ -82,28 +88,43 @@ httpErrorToString err =
             decErr
 
 
-loadedState : { items : Maybe (List ItemBrief), tags : Maybe (List Tag) } -> ( Model, Cmd Msg )
+loadedState : { items : Maybe (List ItemBrief), tags : Maybe (List Tag), csrf : String } -> ( Model, Cmd Msg )
 loadedState load =
     case ( load.items, load.tags ) of
         ( Just items, Just tags ) ->
             let
                 ( itemsModel, itemsCmd ) =
-                    Items.init items
+                    Items.init load.csrf items
 
                 tagsModel =
-                    Tags.init tags
+                    Tags.init load.csrf tags
             in
             ( Model { items = itemsModel, tags = tagsModel }
             , Cmd.map ItemMsg itemsCmd
             )
 
-        ( items, tags ) ->
-            ( Loading { items = items, tags = tags }, Cmd.none )
+        ( _, _ ) ->
+            ( Loading load, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model ) of
+        ( LoadedCSRF csrf, LoadingCSRF ) ->
+            ( Loading
+                { items = Nothing
+                , tags = Nothing
+                , csrf = csrf
+                }
+            , Cmd.batch
+                [ getApiItems csrf (withResult GotLoadingError LoadedItemList)
+                , getApiTags csrf (withResult GotLoadingError LoadedTagList)
+                ]
+            )
+
+        ( LoadedCSRF _, _ ) ->
+            ( model, Cmd.none )
+
         ( GotLoadingError err, _ ) ->
             ( LoadingFailed (httpErrorToString err), Cmd.none )
 
@@ -143,6 +164,9 @@ update msg model =
 view : Model -> Html Msg
 view model =
     case model of
+        LoadingCSRF ->
+            text "Loading..."
+
         Loading _ ->
             text "Loading..."
 

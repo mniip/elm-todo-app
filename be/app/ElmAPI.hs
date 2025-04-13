@@ -64,4 +64,4 @@ main = generateElmModuleWith
   , DefineElm @TagInsert Proxy
   , DefineElm @Color Proxy
   ]
-  (Proxy @API)
+  (Proxy @(Header' '[Required] "x-csrf-token" String :> API))
