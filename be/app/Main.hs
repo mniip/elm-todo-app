@@ -11,8 +11,8 @@ import TODO.Store.InMemory
 main :: IO ()
 main = do
   ref <- newInMemoryStore
-  run 8080 $ authMiddleware $ serveWithContextT
+  run 8080 $ serveWithContextT
     (Proxy @API)
-    EmptyContext
+    (authHandler :. EmptyContext)
     (runInMemoryStoreT ref)
     handlers

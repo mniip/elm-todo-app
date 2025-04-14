@@ -1,13 +1,15 @@
 module TODO.Auth
   ( handleAuth
-  , authMiddleware
+  , authHandler
   ) where
 
+import Control.Monad.Except
 import Data.ByteString (ByteString)
 import Data.Function
-import Network.HTTP.Types.Status
 import Network.Wai
 import Servant.API
+import Servant.Server
+import Servant.Server.Experimental.Auth
 import Web.Cookie
 
 
@@ -27,10 +29,12 @@ handleAuth = pure $ NoContent
     , setCookiePath = Just "/"
     }
 
-authMiddleware :: Middleware
-authMiddleware app req respond = do
-  case pathInfo req of
-    ["api", "auth"] -> app req respond
-    _ -> case lookup "x-csrf-token" $ requestHeaders req of
-      Just "letmein" -> app req respond
-      _ -> respond $ responseBuilder unauthorized401 [] mempty
+data CSRFAuthorized = CSRFAuthorized
+
+type instance AuthServerData (AuthProtect "csrf") = CSRFAuthorized
+
+authHandler :: AuthHandler Request CSRFAuthorized
+authHandler = mkAuthHandler \req
+  -> case lookup "x-csrf-token" $ requestHeaders req of
+    Just "letmein" -> pure CSRFAuthorized
+    _ -> throwError err401

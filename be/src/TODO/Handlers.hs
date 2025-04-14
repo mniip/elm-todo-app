@@ -15,7 +15,7 @@ import TODO.Store
 
 handlers :: MonadTaskStore m => ServerT API.API m
 handlers = API.APIRoutes
-  { items = API.ItemsRoutes
+  { items = \_ -> API.ItemsRoutes
     { listRoot = handleListRootItems
     , get = handleGetItem
     , create = handleCreateItem
@@ -23,7 +23,7 @@ handlers = API.APIRoutes
     , delete = handleDeleteItem
     , reparent = handleReparentItem
     }
-  , tags = API.TagsRoutes
+  , tags = \_ -> API.TagsRoutes
     { list = handleListTags
     , create = handleCreateTag
     , update = handleUpdateTag

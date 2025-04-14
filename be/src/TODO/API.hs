@@ -20,10 +20,12 @@ data APIRoutes mode = APIRoutes
   { items
     :: mode
     :- "items"
+    :> AuthProtect "csrf"
     :> NamedRoutes ItemsRoutes
   , tags
     :: mode
     :- "tags"
+    :> AuthProtect "csrf"
     :> NamedRoutes TagsRoutes
   , auth
     :: mode

@@ -16,6 +16,7 @@ common warnings
     OverloadedRecordDot
     OverloadedStrings
     RecordWildCards
+    TypeFamilies
 
   ghc-options:        -Wall
 
@@ -37,7 +38,6 @@ library
     , containers
     , cookie
     , deriving-aeson
-    , http-types
     , mtl
     , servant
     , servant-server
@@ -68,6 +68,7 @@ executable generate-elm-api
     , elm-bridge
     , servant
     , servant-elm
+    , servant-foreign
     , text
 
   hs-source-dirs: app

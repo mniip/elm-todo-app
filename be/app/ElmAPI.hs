@@ -1,12 +1,14 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Elm.TyRep
 import Servant.API
 import Servant.Elm
+import Servant.Foreign
 import TODO.API
 
 
@@ -41,6 +43,16 @@ typeAlterations = \case
     | t == toElmType @TagId Proxy -> ETyCon (ETCon "TagId")
     | otherwise -> defElmOptions.elmTypeAlterations t
 
+instance
+  ( HasForeignType lang ftype String
+  , HasForeign lang ftype api
+  ) => HasForeign lang ftype (AuthProtect "csrf" :> api) where
+  type Foreign ftype (AuthProtect "csrf" :> api)
+    = Foreign ftype (Header' '[Required] "x-csrf-token" String :> api)
+
+  foreignFor lang ftype Proxy = foreignFor lang ftype
+    $ Proxy @(Header' '[Required] "x-csrf-token" String :> api)
+
 main :: IO ()
 main = generateElmModuleWith
   defElmOptions
@@ -64,4 +76,4 @@ main = generateElmModuleWith
   , DefineElm @TagInsert Proxy
   , DefineElm @Color Proxy
   ]
-  (Proxy @(Header' '[Required] "x-csrf-token" String :> API))
+  (Proxy @API)
