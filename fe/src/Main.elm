@@ -1,7 +1,6 @@
 module Main exposing (main)
 
 import Browser
-import CSRF
 import Generated.API exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (style)
@@ -11,7 +10,7 @@ import Items
 import Tags
 
 
-main : Program () Model Msg
+main : Program String Model Msg
 main =
     Browser.element
         { init = init
@@ -22,8 +21,7 @@ main =
 
 
 type Model
-    = LoadingCSRF
-    | Loading
+    = Loading
         { csrf : String
         , items : Maybe (List ItemBrief)
         , tags : Maybe (List Tag)
@@ -45,25 +43,28 @@ withResult onErr onOk result =
             onOk ok
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( LoadingCSRF, CSRF.getCsrfToken () )
+init : String -> ( Model, Cmd Msg )
+init csrf =
+    ( Loading
+        { items = Nothing
+        , tags = Nothing
+        , csrf = csrf
+        }
+    , Cmd.batch
+        [ getApiItems csrf (withResult GotLoadingError LoadedItemList)
+        , getApiTags csrf (withResult GotLoadingError LoadedTagList)
+        ]
+    )
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
-    case model of
-        LoadingCSRF ->
-            CSRF.gotCsrfToken LoadedCSRF
-
-        _ ->
-            Sub.none
+subscriptions _ =
+    Sub.none
 
 
 type Msg
     = LoadedItemList (List ItemBrief)
     | LoadedTagList (List Tag)
-    | LoadedCSRF String
     | GotLoadingError Http.Error
     | TagMsg Tags.Msg
     | ItemMsg Items.Msg
@@ -110,21 +111,6 @@ loadedState load =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model ) of
-        ( LoadedCSRF csrf, LoadingCSRF ) ->
-            ( Loading
-                { items = Nothing
-                , tags = Nothing
-                , csrf = csrf
-                }
-            , Cmd.batch
-                [ getApiItems csrf (withResult GotLoadingError LoadedItemList)
-                , getApiTags csrf (withResult GotLoadingError LoadedTagList)
-                ]
-            )
-
-        ( LoadedCSRF _, _ ) ->
-            ( model, Cmd.none )
-
         ( GotLoadingError err, _ ) ->
             ( LoadingFailed (httpErrorToString err), Cmd.none )
 
@@ -164,9 +150,6 @@ update msg model =
 view : Model -> Html Msg
 view model =
     case model of
-        LoadingCSRF ->
-            text "Loading..."
-
         Loading _ ->
             text "Loading..."
 
